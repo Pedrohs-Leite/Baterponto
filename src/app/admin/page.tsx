@@ -1,8 +1,142 @@
 "use client";
-import {useEffect,useMemo,useState}from"react";
-import{supabase}from"@/lib/supabase";
-type E={id:string;name:string;role:string};type R={employee_id:string;entry_time:string|null;break_start:string|null;break_end:string|null;exit_time:string|null};
-const d=()=>new Date().toISOString().slice(0,10),t=(v:string|null)=>v?new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit"}).format(new Date(v)):"—",dateLabel=new Intl.DateTimeFormat("pt-BR",{weekday:"long",day:"2-digit",month:"long"}).format(new Date());
-function saldo(r?:R){if(!r?.entry_time)return"—";if(!r.exit_time)return"Em andamento";const ms=new Date(r.exit_time).getTime()-new Date(r.entry_time).getTime()-(r.break_start&&r.break_end?new Date(r.break_end).getTime()-new Date(r.break_start).getTime():0),m=Math.round(ms/60000)-480;return`${m>=0?"+":"-"} ${String(Math.abs(m)).padStart(2,"0")} min`}
-export default function Admin(){const[employees,setEmployees]=useState<E[]>([]),[records,setRecords]=useState<R[]>([]),[query,setQuery]=useState(""),[open,setOpen]=useState(false),[name,setName]=useState(""),[pin,setPin]=useState(""),[notice,setNotice]=useState("");async function load(){const[a,b]=await Promise.all([supabase.from("employees").select("id,name,role").eq("active",true).order("name"),supabase.from("time_records").select("employee_id,entry_time,break_start,break_end,exit_time").eq("work_date",d())]);if(a.error||b.error){setNotice("Não foi possível carregar o banco. Execute o SQL de configuração no Supabase.");return}setEmployees(a.data??[]);setRecords(b.data??[])}useEffect(()=>{const id=setTimeout(()=>void load(),0);return()=>clearTimeout(id)},[]);const rows=useMemo(()=>employees.filter(e=>e.name.toLowerCase().includes(query.toLowerCase())).map(e=>({e,r:records.find(x=>x.employee_id===e.id)})),[employees,records,query]);async function save(){if(!name||!pin)return;const{error}=await supabase.from("employees").insert({name,role:"Colaborador",pin});if(error){setNotice("Não foi possível salvar. Verifique se o PIN é único.");return}setOpen(false);setName("");setPin("");setNotice("Funcionário salvo no Supabase. O PIN já funciona no totem.");void load()}const total=records.reduce((sum,r)=>{const s=saldo(r);return sum+(s.startsWith("+")?Number(s.match(/\d+/)?.[0]??0):s.startsWith("-")?-Number(s.match(/\d+/)?.[0]??0):0)},0);return <main className="min-h-screen bg-[#fffafa] text-slate-900"><header className="border-b border-red-100 bg-white"><div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6"><div className="h-16 w-52 overflow-hidden"><img src="/logo-convida.png" alt="Convida" className="h-44 w-full -translate-y-10 scale-125 object-cover"/></div><span className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">PAINEL ADMINISTRATIVO</span></div></header><section className="mx-auto max-w-7xl px-6 py-9"><div className="mb-8 flex items-end justify-between"><div><p className="text-sm font-bold text-red-600">VISÃO GERAL</p><h1 className="mt-1 text-3xl font-bold">Olá, Administrador</h1><p className="mt-2 capitalize text-slate-500">{dateLabel}</p></div><button onClick={()=>setOpen(true)} className="rounded-xl bg-red-700 px-5 py-3 text-sm font-bold text-white">+ Cadastrar funcionário</button></div>{notice&&<p className="mb-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{notice}</p>}<div className="grid gap-4 md:grid-cols-4"><Card a="Funcionários" b={String(employees.length)}/><Card a="Presentes hoje" b={String(records.filter(r=>r.entry_time).length)}/><Card a="Em jornada" b={String(records.filter(r=>r.entry_time&&!r.exit_time).length)}/><Card a="Saldo da equipe" b={`${total>=0?"+":"-"} ${Math.abs(total)} min`}/></div><div className="mt-7 overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="font-bold">Registros de hoje</h2><p className="capitalize text-sm text-slate-500">{dateLabel}</p></div><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar funcionário" className="rounded-xl border border-slate-200 px-4 py-2 text-sm outline-none"/></div><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-400"><tr><th className="px-6 py-4">Colaborador</th><th>Entrada</th><th>Intervalo</th><th>Retorno</th><th>Saída</th><th>Saldo</th><th className="px-6">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(({e,r})=>{const s=saldo(r);return <tr key={e.id}><td className="px-6 py-4"><b>{e.name}</b><small className="block text-slate-400">{e.role}</small></td><td>{t(r?.entry_time??null)}</td><td>{t(r?.break_start??null)}</td><td>{t(r?.break_end??null)}</td><td>{t(r?.exit_time??null)}</td><td className={`font-bold ${s.startsWith("+")?"text-emerald-600":s.startsWith("-")?"text-rose-600":"text-slate-500"}`}>{s}</td><td className="px-6">{r?.exit_time?"Concluído":r?.entry_time?"Em jornada":"Sem registro"}</td></tr>})}</tbody></table></div></div></section>{open&&<div className="fixed inset-0 grid place-items-center bg-slate-950/35 px-5"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 className="text-xl font-bold">Cadastrar funcionário</h2><input value={name} onChange={e=>setName(e.target.value)} placeholder="Nome completo" className="mt-6 w-full rounded-xl border p-3"/><input value={pin} maxLength={3} onChange={e=>setPin(e.target.value.replace(/\D/g,""))} placeholder="PIN" className="mt-3 w-full rounded-xl border p-3"/><div className="mt-5 flex gap-3"><button onClick={()=>setOpen(false)} className="flex-1 rounded-xl border py-3 font-bold">Cancelar</button><button onClick={save} className="flex-1 rounded-xl bg-red-700 py-3 font-bold text-white">Salvar</button></div></div></div>}</main>}
-function Card({a,b}:{a:string;b:string}){return <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm"><p className="text-sm text-slate-500">{a}</p><p className="mt-3 text-2xl font-bold">{b}</p></div>}
+
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import styles from "./admin.module.css";
+
+type Employee = { id: string; name: string; role: string };
+type Record = { employee_id: string; entry_time: string | null; break_start: string | null; break_end: string | null; exit_time: string | null };
+
+const today = () => new Date().toISOString().slice(0, 10);
+const time = (value: string | null) => value ? new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
+const dateLabel = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long" }).format(new Date());
+
+function balance(record?: Record) {
+  if (!record?.entry_time) return "—";
+  if (!record.exit_time) return "Em curso";
+  const worked = new Date(record.exit_time).getTime() - new Date(record.entry_time).getTime() - (record.break_start && record.break_end ? new Date(record.break_end).getTime() - new Date(record.break_start).getTime() : 0);
+  const minutes = Math.round(worked / 60000) - 480;
+  return `${minutes >= 0 ? "+" : "−"} ${String(Math.abs(minutes)).padStart(2, "0")} min`;
+}
+
+export default function Admin() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [records, setRecords] = useState<Record[]>([]);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [pin, setPin] = useState("");
+  const [notice, setNotice] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  async function load() {
+    const [employeeResult, recordResult] = await Promise.all([
+      supabase.from("employees").select("id,name,role").eq("active", true).order("name"),
+      supabase.from("time_records").select("employee_id,entry_time,break_start,break_end,exit_time").eq("work_date", today()),
+    ]);
+    if (employeeResult.error || recordResult.error) {
+      setNotice("Conecte o Supabase para visualizar a operação em tempo real.");
+      return;
+    }
+    setEmployees(employeeResult.data ?? []);
+    setRecords(recordResult.data ?? []);
+  }
+
+  useEffect(() => { const id = setTimeout(() => void load(), 0); return () => clearTimeout(id); }, []);
+
+  const rows = useMemo(() => employees.filter((employee) => employee.name.toLowerCase().includes(query.toLowerCase())).map((employee) => ({ employee, record: records.find((item) => item.employee_id === employee.id) })), [employees, records, query]);
+
+  async function save() {
+    if (!name.trim() || pin.length !== 3) return;
+    const { error } = await supabase.from("employees").insert({ name: name.trim(), role: "Colaborador", pin });
+    if (error) { setNotice("Não foi possível salvar. Confirme se o PIN já está em uso."); return; }
+    setOpen(false); setName(""); setPin(""); setNotice("Funcionário adicionado. O novo PIN já está disponível no totem."); void load();
+  }
+
+  const present = records.filter((record) => record.entry_time).length;
+  const working = records.filter((record) => record.entry_time && !record.exit_time).length;
+  const total = records.reduce((sum, record) => {
+    const value = balance(record);
+    const minutes = Number(value.match(/\d+/)?.[0] ?? 0);
+    return sum + (value.startsWith("+") ? minutes : value.startsWith("−") ? -minutes : 0);
+  }, 0);
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.layout}>
+        <aside className={`${styles.sidebar} ${mobileNavOpen ? styles.mobileOpen : ""}`}>
+          <div className={styles.brand}><Image src="/logo-convida.png" width={1920} height={1920} alt="Convida" priority /></div>
+          <div className={styles.workspace}><small>Unidade atual</small><strong>Matriz · Convida</strong></div>
+          <nav className={styles.nav} aria-label="Navegação principal">
+            <NavItem active icon={<GridIcon />} label="Visão geral" />
+            <NavItem icon={<ClockIcon />} label="Jornadas" />
+            <NavItem icon={<PeopleIcon />} label="Equipe" />
+            <NavItem icon={<ReportIcon />} label="Relatórios" />
+            <NavItem icon={<SettingsIcon />} label="Configurações" />
+          </nav>
+          <div className={styles.sidebarFoot}>
+            <div className={styles.adminIdentity}><span className={styles.avatar}>AD</span><div><b>Administrador</b><span>Gestão de pessoas</span></div></div>
+            <p className={styles.version}>Convida · 20 anos</p>
+            <button className={styles.closeMenu} onClick={() => setMobileNavOpen(false)}>Fechar menu</button>
+          </div>
+        </aside>
+
+        <div className={styles.content}>
+          <div className={styles.mobileHeader}><div className={styles.mobileBrand}><Image src="/logo-convida.png" width={1920} height={1920} alt="Convida" /></div><button className={styles.mobileMenu} aria-label="Abrir menu" onClick={() => setMobileNavOpen(true)}><MenuIcon /></button></div>
+          <header className={styles.topbar}>
+            <p className={styles.breadcrumb}>Convida <span> / </span> <b>Controle de ponto</b></p>
+            <div className={styles.topActions}><button className={styles.iconButton} aria-label="Notificações"><BellIcon /></button><span className={styles.datePill}>{dateLabel}</span></div>
+          </header>
+
+          <section className={styles.hero}>
+            <div><p className={styles.kicker}>Centro de comando</p><h1>O pulso da equipe.</h1><p className={styles.heroSub}>Acompanhe a jornada de hoje sem perder o ritmo.</p></div>
+            <button className={styles.addButton} onClick={() => setOpen(true)}><PlusIcon /><span>Novo funcionário</span></button>
+          </section>
+
+          {notice && <div className={styles.notice} role="status">{notice}</div>}
+
+          <section className={styles.metrics} aria-label="Indicadores do dia">
+            <Metric featured label="Equipe ativa" value={String(employees.length).padStart(2, "0")} meta="pessoas cadastradas" icon={<PeopleIcon />} />
+            <Metric label="Presentes" value={String(present).padStart(2, "0")} meta="registros hoje" icon={<CheckCircleIcon />} />
+            <Metric label="Em jornada" value={String(working).padStart(2, "0")} meta="agora" icon={<PulseIcon />} />
+            <Metric label="Saldo coletivo" value={`${total >= 0 ? "+" : "−"} ${Math.abs(total)}m`} meta="acumulado do dia" icon={<TrendIcon />} />
+          </section>
+
+          <section className={styles.records}>
+            <header className={styles.recordsHead}>
+              <div className={styles.recordsTitle}><span className={styles.recordsMark}><ClockIcon /></span><div><h2>Ritmo de hoje</h2><p>{dateLabel} · acompanhamento ao vivo</p></div></div>
+              <label className={styles.search}><SearchIcon /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar na equipe" aria-label="Buscar funcionário" /></label>
+            </header>
+            <div className={styles.tableWrap}>
+              {rows.length ? <table className={styles.table}><thead><tr><th>Colaborador</th><th>Entrada</th><th>Pausa</th><th>Retorno</th><th>Saída</th><th>Saldo</th><th>Situação</th></tr></thead><tbody>{rows.map(({ employee, record }) => {
+                const currentBalance = balance(record);
+                const status = record?.exit_time ? "Concluído" : record?.entry_time ? "Em jornada" : "Sem registro";
+                return <tr key={employee.id}><td><div className={styles.personCell}><span className={styles.personAvatar}>{initials(employee.name)}</span><span><b>{employee.name}</b><small>{employee.role}</small></span></div></td><td>{time(record?.entry_time ?? null)}</td><td>{time(record?.break_start ?? null)}</td><td>{time(record?.break_end ?? null)}</td><td>{time(record?.exit_time ?? null)}</td><td className={`${styles.balance} ${currentBalance.startsWith("+") ? styles.positive : currentBalance.startsWith("−") ? styles.negative : styles.neutral}`}>{currentBalance}</td><td><span className={`${styles.status} ${status === "Concluído" ? styles.done : status === "Em jornada" ? styles.working : styles.absent}`}>{status}</span></td></tr>;
+              })}</tbody></table> : <div className={styles.empty}><strong>{query ? "Ninguém por aqui." : "O dia ainda está em silêncio."}</strong>{query ? "Tente buscar por outro nome." : "Os registros aparecem assim que a equipe começar a jornada."}</div>}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {open && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}><div className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="new-employee-title"><div className={styles.modalBand} /><div className={styles.modalBody}><span className={styles.modalIcon}><PeopleIcon /></span><h2 id="new-employee-title">Alguém novo na equipe.</h2><p className={styles.modalIntro}>Cadastre os dados essenciais para liberar o acesso ao totem.</p><div className={styles.field}><label htmlFor="employee-name">Nome completo</label><input id="employee-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Ana Beatriz Silva" autoFocus /></div><div className={styles.field}><label htmlFor="employee-pin">PIN de acesso</label><input id="employee-pin" value={pin} maxLength={3} inputMode="numeric" onChange={(event) => setPin(event.target.value.replace(/\D/g, ""))} placeholder="3 dígitos" /></div><div className={styles.modalActions}><button className={styles.cancelButton} onClick={() => setOpen(false)}>Agora não</button><button className={styles.saveButton} onClick={save}>Adicionar à equipe</button></div></div></div></div>}
+    </main>
+  );
+}
+
+function initials(name: string) { return name.split(" ").map((part) => part[0]).slice(0, 2).join(""); }
+function NavItem({ active, icon, label }: { active?: boolean; icon: React.ReactNode; label: string }) { return <span className={`${styles.navItem} ${active ? styles.active : ""}`}>{icon}<span>{label}</span></span>; }
+function Metric({ featured, label, value, meta, icon }: { featured?: boolean; label: string; value: string; meta: string; icon: React.ReactNode }) { return <article className={`${styles.metric} ${featured ? styles.metricFeature : ""}`}><div className={styles.metricTop}><span>{label}</span><span className={styles.metricIcon}>{icon}</span></div><strong className={styles.metricValue}>{value}</strong><small className={styles.metricMeta}>{meta}</small></article>; }
+function Svg({ children }: { children: React.ReactNode }) { return <svg viewBox="0 0 24 24" aria-hidden="true">{children}</svg>; }
+function GridIcon(){return <Svg><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></Svg>}
+function ClockIcon(){return <Svg><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></Svg>}
+function PeopleIcon(){return <Svg><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8m13 18v-2a4 4 0 0 0-3-3.87m-2-12a4 4 0 0 1 0 7.75"/></Svg>}
+function ReportIcon(){return <Svg><path d="M4 19V9m6 10V5m6 14v-7m5 7H2"/></Svg>}
+function SettingsIcon(){return <Svg><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1v.1h-4v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1-.4h-.1v-4H3a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1v-.1h4V3a1.7 1.7 0 0 0 1.1 1.6 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.18.37.46.7.8.93.3.2.65.32 1 .34h.1v4h-.1A1.7 1.7 0 0 0 19.4 15Z"/></Svg>}
+function BellIcon(){return <Svg><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 13h4"/></Svg>}
+function PlusIcon(){return <Svg><path d="M12 5v14M5 12h14"/></Svg>}
+function CheckCircleIcon(){return <Svg><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></Svg>}
+function PulseIcon(){return <Svg><path d="M3 12h4l2-6 4 12 2-6h6"/></Svg>}
+function TrendIcon(){return <Svg><path d="m3 17 6-6 4 4 8-8m-5 0h5v5"/></Svg>}
+function SearchIcon(){return <Svg><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></Svg>}
+function MenuIcon(){return <Svg><path d="M4 7h16M4 12h16M4 17h16"/></Svg>}

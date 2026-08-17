@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PontoSimples | Demonstração",
-  description: "Protótipo de controle de ponto",
+  title: "Convida | Controle de ponto",
+  description: "Totem digital de controle de ponto da Convida",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
