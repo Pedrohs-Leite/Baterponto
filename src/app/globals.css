@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+ :root { --background: #fffafa; --foreground: #211111; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+img[src="/logo-convida.png"] {
+  display: block;
+  width: 96px !important;
+  height: 80px !important;
+  max-width: none !important;
+  margin: -8px auto 0 !important;
+  transform: none !important;
+  object-fit: contain !important;
+}
+
+input { transition: border-color .2s ease, box-shadow .2s ease; }
+input:focus { border-color: #d1121b !important; box-shadow: 0 0 0 3px rgba(209, 18, 27, .10); }
