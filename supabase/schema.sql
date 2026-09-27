@@ -3,6 +3,7 @@ create table if not exists public.employees (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   role text not null default 'Colaborador',
+  photo_url text,
   pin text not null unique check (pin ~ '^[0-9]{1,3}$'),
   shift_type text not null default 'full' check (shift_type in ('full', 'half')),
   active boolean not null default true,

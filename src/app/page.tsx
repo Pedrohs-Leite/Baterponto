@@ -106,8 +106,7 @@ export default function Totem() {
       <article className="totem-shell">
         <header className="brand-header">
           <div className="brand-glow" />
-          <div className="logo-crop" aria-label="Convida 20 anos"><Image src="/logo-convida.png" alt="Convida — 20 anos" width={1920} height={1920} priority /></div>
-          <span className="brand-divider" /><p>Controle de ponto</p>
+          <div className="logo-crop" aria-label="Convida 20 anos"><Image src="/logo-convida-branca.png" alt="Convida — 20 anos" width={1608} height={1608} priority /></div>
         </header>
         <section className="time-panel" aria-label="Data e hora atual">
           <div><span className="live-dot" /><span>Totem online</span></div><strong>{clock}</strong><p>{formatDate()}</p>
